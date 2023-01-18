@@ -31,3 +31,6 @@
 [submodule "applications/plugins/dap_link/lib/free-dap"]
 	path = applications/plugins/dap_link/lib/free-dap
 	url = https://github.com/ataradov/free-dap.git
+[submodule "applications_user/scd30"]
+	path = applications_user/scd30
+	url = git@github.com:heimskr/flipperzero-scd30.git
