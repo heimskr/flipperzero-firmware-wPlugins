@@ -34,3 +34,6 @@
 [submodule "applications_user/bme680"]
 	path = applications_user/bme680
 	url = git@github.com:heimskr/flipperzero-bme680.git
+[submodule "applications_user/scd30"]
+	path = applications_user/scd30
+	url = git@github.com:heimskr/flipperzero-scd30.git
