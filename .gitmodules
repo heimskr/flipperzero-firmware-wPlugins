@@ -38,3 +38,6 @@
 	path = applications_user/scd30
 	url = git@github.com:heimskr/flipperzero-scd30.git
 
+[submodule "applications/plugins/tama_p1"]
+	path = applications/plugins/tama_p1
+	url = https://github.com/DroomOne/flipperzero-tamagotch-p1.git
