@@ -37,3 +37,4 @@
 [submodule "applications_user/scd30"]
 	path = applications_user/scd30
 	url = git@github.com:heimskr/flipperzero-scd30.git
+
