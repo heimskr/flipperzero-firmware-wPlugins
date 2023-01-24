@@ -42,4 +42,4 @@
 	url = https://github.com/Smileycathy1128/flipperzero-tamagotch-p1.git
 [submodule "applications_user/mcp4725"]
 	path = applications_user/mcp4725
-	url = git@github.com:heimskr/flipperzero-mcp4725.git
+	url = https://github.com/heimskr/flipperzero-mcp4725.git
