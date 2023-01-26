@@ -43,6 +43,3 @@
 [submodule "applications_user/mcp4725"]
 	path = applications_user/mcp4725
 	url = https://github.com/heimskr/flipperzero-mcp4725.git
-[submodule "applications_user/scope"]
-	path = applications_user/scope
-	url = https://github.com/anfractuosity/flipperscope.git
