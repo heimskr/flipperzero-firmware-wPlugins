@@ -89,6 +89,27 @@ bool furi_hal_i2c_trx(
     const uint8_t rx_size,
     uint32_t timeout);
 
+/** Perform I2C tx and rx transfers with DMA
+ *
+ * @param      handle      pointer to FuriHalI2cBusHandle instance
+ * @param      address     I2C slave address
+ * @param      tx_data     pointer to tx data buffer
+ * @param      tx_size     size of tx data buffer
+ * @param      rx_data     pointer to rx data buffer
+ * @param      rx_size     size of rx data buffer
+ * @param      timeout_ms  timeout in ticks
+ *
+ * @return     true on successful transfer, false otherwise
+ */
+bool furi_hal_i2c_bus_trx_dma(
+    FuriHalI2cBusHandle* handle,
+    const uint8_t address,
+    const uint8_t* tx_data,
+    const uint8_t tx_size,
+    uint8_t* rx_data,
+    const uint8_t rx_size,
+    uint32_t timeout_ms);
+
 /** Check if I2C device presents on bus
  *
  * @param      handle   pointer to FuriHalI2cBusHandle instance

@@ -13,10 +13,10 @@
 #define TAG "FuriHalI2C"
 
 #define I2C_DMA DMA2
-#define I2C_DMA_RX_CHANNEL LL_DMA_CHANNEL_5
-#define I2C_DMA_TX_CHANNEL LL_DMA_CHANNEL_6
-#define I2C_DMA_RX_IRQ FuriHalInterruptIdDma2Ch5
-#define I2C_DMA_TX_IRQ FuriHalInterruptIdDma2Ch6
+#define I2C_DMA_RX_CHANNEL LL_DMA_CHANNEL_3
+#define I2C_DMA_TX_CHANNEL LL_DMA_CHANNEL_4
+#define I2C_DMA_RX_IRQ FuriHalInterruptIdDma2Ch3
+#define I2C_DMA_TX_IRQ FuriHalInterruptIdDma2Ch4
 #define I2C_DMA_RX_DEF I2C_DMA, I2C_DMA_RX_CHANNEL
 #define I2C_DMA_TX_DEF I2C_DMA, I2C_DMA_TX_CHANNEL
 
@@ -186,18 +186,19 @@ bool furi_hal_i2c_trx(
 }
 
 static void i2c_dma_isr() {
-#if I2C_DMA_RX_CHANNEL == LL_DMA_CHANNEL_5
-    if(LL_DMA_IsActiveFlag_TC5(I2C_DMA) && LL_DMA_IsEnabledIT_TC(I2C_DMA_RX_DEF)) {
-        LL_DMA_ClearFlag_TC5(I2C_DMA);
+    FURI_LOG_E(TAG, "I2C DMA ISR\r\n");
+#if I2C_DMA_RX_CHANNEL == LL_DMA_CHANNEL_3
+    if(LL_DMA_IsActiveFlag_TC3(I2C_DMA) && LL_DMA_IsEnabledIT_TC(I2C_DMA_RX_DEF)) {
+        LL_DMA_ClearFlag_TC3(I2C_DMA);
         furi_check(furi_semaphore_release(i2c_dma_completed) == FuriStatusOk);
     }
 #else
 #error Update this code. Would you kindly?
 #endif
 
-#if I2C_DMA_TX_CHANNEL == LL_DMA_CHANNEL_6
-    if(LL_DMA_IsActiveFlag_TC6(I2C_DMA) && LL_DMA_IsEnabledIT_TC(I2C_DMA_TX_DEF)) {
-        LL_DMA_ClearFlag_TC6(I2C_DMA);
+#if I2C_DMA_TX_CHANNEL == LL_DMA_CHANNEL_4
+    if(LL_DMA_IsActiveFlag_TC4(I2C_DMA) && LL_DMA_IsEnabledIT_TC(I2C_DMA_TX_DEF)) {
+        LL_DMA_ClearFlag_TC4(I2C_DMA);
         furi_check(furi_semaphore_release(i2c_dma_completed) == FuriStatusOk);
     }
 #else
@@ -251,8 +252,8 @@ bool furi_hal_i2c_bus_trx_dma(
         dma_config.Priority = LL_DMA_PRIORITY_MEDIUM;
         LL_DMA_Init(I2C_DMA_TX_DEF, &dma_config);
 
-#if I2C_DMA_TX_CHANNEL == LL_DMA_CHANNEL_6
-        LL_DMA_ClearFlag_TC6(I2C_DMA);
+#if I2C_DMA_TX_CHANNEL == LL_DMA_CHANNEL_4
+        LL_DMA_ClearFlag_TC4(I2C_DMA);
 #else
 #error Update this code. Would you kindly?
 #endif
@@ -273,7 +274,7 @@ bool furi_hal_i2c_bus_trx_dma(
         // and wait for it to be released (DMA transfer complete)
         if(furi_semaphore_acquire(i2c_dma_completed, timeout_ms) != FuriStatusOk) {
             ret = false;
-            FURI_LOG_E(TAG, "DMA timeout\r\n");
+            FURI_LOG_E(TAG, "DMA timeout 1\r\n");
         }
         // release semaphore, because we are using it as a flag
         furi_semaphore_release(i2c_dma_completed);
@@ -323,8 +324,8 @@ bool furi_hal_i2c_bus_trx_dma(
         dma_config.Priority = LL_DMA_PRIORITY_MEDIUM;
         LL_DMA_Init(I2C_DMA_RX_DEF, &dma_config);
 
-#if I2C_DMA_RX_CHANNEL == LL_DMA_CHANNEL_5
-        LL_DMA_ClearFlag_TC5(I2C_DMA);
+#if I2C_DMA_RX_CHANNEL == LL_DMA_CHANNEL_3
+        LL_DMA_ClearFlag_TC3(I2C_DMA);
 #else
 #error Update this code. Would you kindly?
 #endif
@@ -352,7 +353,7 @@ bool furi_hal_i2c_bus_trx_dma(
         // and wait for it to be released (DMA transfer complete)
         if(furi_semaphore_acquire(i2c_dma_completed, timeout_ms) != FuriStatusOk) {
             ret = false;
-            FURI_LOG_E(TAG, "DMA timeout\r\n");
+            FURI_LOG_E(TAG, "DMA timeout 2\r\n");
         }
         // release semaphore, because we are using it as a flag
         furi_semaphore_release(i2c_dma_completed);
