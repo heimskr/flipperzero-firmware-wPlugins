@@ -12,11 +12,11 @@
 
 #define TAG "FuriHalI2C"
 
-#define I2C_DMA DMA2
-#define I2C_DMA_RX_CHANNEL LL_DMA_CHANNEL_3
-#define I2C_DMA_TX_CHANNEL LL_DMA_CHANNEL_4
-#define I2C_DMA_RX_IRQ FuriHalInterruptIdDma2Ch3
-#define I2C_DMA_TX_IRQ FuriHalInterruptIdDma2Ch4
+#define I2C_DMA DMA1
+#define I2C_DMA_RX_CHANNEL LL_DMA_CHANNEL_2
+#define I2C_DMA_TX_CHANNEL LL_DMA_CHANNEL_1
+#define I2C_DMA_RX_IRQ FuriHalInterruptIdDma1Ch2
+#define I2C_DMA_TX_IRQ FuriHalInterruptIdDma1Ch1
 #define I2C_DMA_RX_DEF I2C_DMA, I2C_DMA_RX_CHANNEL
 #define I2C_DMA_TX_DEF I2C_DMA, I2C_DMA_TX_CHANNEL
 
@@ -187,18 +187,18 @@ bool furi_hal_i2c_trx(
 
 static void i2c_dma_isr() {
     FURI_LOG_E(TAG, "I2C DMA ISR\r\n");
-#if I2C_DMA_RX_CHANNEL == LL_DMA_CHANNEL_3
-    if(LL_DMA_IsActiveFlag_TC3(I2C_DMA) && LL_DMA_IsEnabledIT_TC(I2C_DMA_RX_DEF)) {
-        LL_DMA_ClearFlag_TC3(I2C_DMA);
+#if I2C_DMA_RX_CHANNEL == LL_DMA_CHANNEL_2
+    if(LL_DMA_IsActiveFlag_TC2(I2C_DMA) && LL_DMA_IsEnabledIT_TC(I2C_DMA_RX_DEF)) {
+        LL_DMA_ClearFlag_TC2(I2C_DMA);
         furi_check(furi_semaphore_release(i2c_dma_completed) == FuriStatusOk);
     }
 #else
 #error Update this code. Would you kindly?
 #endif
 
-#if I2C_DMA_TX_CHANNEL == LL_DMA_CHANNEL_4
-    if(LL_DMA_IsActiveFlag_TC4(I2C_DMA) && LL_DMA_IsEnabledIT_TC(I2C_DMA_TX_DEF)) {
-        LL_DMA_ClearFlag_TC4(I2C_DMA);
+#if I2C_DMA_TX_CHANNEL == LL_DMA_CHANNEL_1
+    if(LL_DMA_IsActiveFlag_TC1(I2C_DMA) && LL_DMA_IsEnabledIT_TC(I2C_DMA_TX_DEF)) {
+        LL_DMA_ClearFlag_TC1(I2C_DMA);
         furi_check(furi_semaphore_release(i2c_dma_completed) == FuriStatusOk);
     }
 #else
@@ -252,8 +252,8 @@ bool furi_hal_i2c_bus_trx_dma(
         dma_config.Priority = LL_DMA_PRIORITY_MEDIUM;
         LL_DMA_Init(I2C_DMA_TX_DEF, &dma_config);
 
-#if I2C_DMA_TX_CHANNEL == LL_DMA_CHANNEL_4
-        LL_DMA_ClearFlag_TC4(I2C_DMA);
+#if I2C_DMA_TX_CHANNEL == LL_DMA_CHANNEL_1
+        LL_DMA_ClearFlag_TC1(I2C_DMA);
 #else
 #error Update this code. Would you kindly?
 #endif
@@ -324,8 +324,8 @@ bool furi_hal_i2c_bus_trx_dma(
         dma_config.Priority = LL_DMA_PRIORITY_MEDIUM;
         LL_DMA_Init(I2C_DMA_RX_DEF, &dma_config);
 
-#if I2C_DMA_RX_CHANNEL == LL_DMA_CHANNEL_3
-        LL_DMA_ClearFlag_TC3(I2C_DMA);
+#if I2C_DMA_RX_CHANNEL == LL_DMA_CHANNEL_2
+        LL_DMA_ClearFlag_TC2(I2C_DMA);
 #else
 #error Update this code. Would you kindly?
 #endif
