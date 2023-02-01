@@ -14,10 +14,10 @@ DEBUG = 0
 
 # Suffix to add to files when building distribution
 # If OS environment has DIST_SUFFIX set, it will be used instead
-DIST_SUFFIX = "RM420FAP"
+DIST_SUFFIX = "HMSKRFAP"
 
 # Coprocessor firmware
-COPRO_OB_DATA = "scripts/ob.data"
+COPRO_OB_DATA = "scripts/ob_custradio.data"
 
 # Must match lib/STM32CubeWB version
 COPRO_CUBE_VERSION = "1.13.3"
@@ -25,9 +25,9 @@ COPRO_CUBE_VERSION = "1.13.3"
 COPRO_CUBE_DIR = "lib/STM32CubeWB"
 
 # Default radio stack
-COPRO_STACK_BIN = "stm32wb5x_BLE_Stack_light_fw.bin"
+COPRO_STACK_BIN = "stm32wb5x_BLE_Stack_full_fw.bin"
 # Firmware also supports "ble_full", but it might not fit into debug builds
-COPRO_STACK_TYPE = "ble_light"
+COPRO_STACK_TYPE = "ble_full"
 
 # Leave 0 to let scripts automatically calculate it
 COPRO_STACK_ADDR = "0x0"
