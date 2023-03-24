@@ -5,6 +5,7 @@
 #include <furi_hal.h>
 
 #define POWER_OFF_TIMEOUT 90
+#define TAG "Power"
 
 void power_draw_battery_callback(Canvas* canvas, void* context) {
     furi_assert(context);
@@ -62,11 +63,11 @@ void power_draw_battery_callback(Canvas* canvas, void* context) {
         } else if(
             (power->displayBatteryPercentage == DISPLAY_BATTERY_BAR_PERCENT) &&
             (power->state != PowerStateCharging) && // Default bar display with percentage
-            (power->info.voltage_battery_charging >=
+            (power->info.voltage_battery_charge_limit >=
              4.2)) { // not looking nice with low voltage indicator
             canvas_set_font(canvas, FontBatteryPercent);
 
-            // align charge dispaly value with digits to draw
+            // align charge display value with digits to draw
             uint8_t bar_charge = power->info.charge;
             if(bar_charge > 23 && bar_charge < 38) {
                 bar_charge = 23;
@@ -117,7 +118,7 @@ void power_draw_battery_callback(Canvas* canvas, void* context) {
         }
 
         // TODO: Verify if it displays correctly with custom battery skins !!!
-        if(power->info.voltage_battery_charging < 4.2) {
+        if(power->info.voltage_battery_charge_limit < 4.2) {
             // Battery charging voltage is modified, indicate with cross pattern
             canvas_invert_color(canvas);
             uint8_t battery_bar_width = (power->info.charge + 4) / 5;
@@ -158,7 +159,7 @@ void power_draw_battery_callback(Canvas* canvas, void* context) {
                 canvas_set_color(canvas, ColorWhite);
                 canvas_draw_box(canvas, 1, 1, 22, 6);
 
-                // align charge dispaly value with digits to draw
+                // align charge display value with digits to draw
                 uint8_t bar_charge = power->info.charge;
 
                 if(bar_charge > 48 && bar_charge < 63) {
@@ -229,6 +230,14 @@ static ViewPort* power_battery_view_port_alloc(Power* power) {
     view_port_draw_callback_set(battery_view_port, power_draw_battery_callback, power);
     gui_add_view_port(power->gui, battery_view_port, GuiLayerStatusBarRight);
     return battery_view_port;
+}
+
+static ViewPort* power_battery_slim_view_port_alloc(Power* power) {
+    ViewPort* battery_slim_view_port = view_port_alloc();
+    view_port_set_width(battery_slim_view_port, icon_get_width(&I_Battery_26x8));
+    view_port_draw_callback_set(battery_slim_view_port, power_draw_battery_callback, power);
+    gui_add_view_port(power->gui, battery_slim_view_port, GuiLayerStatusBarRightSlim);
+    return battery_slim_view_port;
 }
 
 static void power_start_auto_shutdown_timer(Power* power) {
@@ -343,6 +352,7 @@ Power* power_alloc() {
 
     // Battery view port
     power->battery_view_port = power_battery_view_port_alloc(power);
+    power->battery_slim_view_port = power_battery_slim_view_port_alloc(power);
     power->show_low_bat_level_message = true;
 
     //Auto shutdown timer
@@ -362,6 +372,7 @@ void power_free(Power* power) {
     power_unplug_usb_free(power->power_unplug_usb);
 
     view_port_free(power->battery_view_port);
+    view_port_free(power->battery_slim_view_port);
 
     // State
     furi_mutex_free(power->api_mtx);
@@ -430,7 +441,7 @@ static bool power_update_info(Power* power) {
     info.capacity_full = furi_hal_power_get_battery_full_capacity();
     info.current_charger = furi_hal_power_get_battery_current(FuriHalPowerICCharger);
     info.current_gauge = furi_hal_power_get_battery_current(FuriHalPowerICFuelGauge);
-    info.voltage_battery_charging = furi_hal_power_get_battery_charging_voltage();
+    info.voltage_battery_charge_limit = furi_hal_power_get_battery_charge_voltage_limit();
     info.voltage_charger = furi_hal_power_get_battery_voltage(FuriHalPowerICCharger);
     info.voltage_gauge = furi_hal_power_get_battery_voltage(FuriHalPowerICFuelGauge);
     info.voltage_vbus = furi_hal_power_get_usb_voltage();
@@ -501,6 +512,12 @@ static void power_check_battery_level_change(Power* power) {
 
 int32_t power_srv(void* p) {
     UNUSED(p);
+
+    if(furi_hal_rtc_get_boot_mode() != FuriHalRtcBootModeNormal) {
+        FURI_LOG_W(TAG, "Skipping start in special boot mode");
+        return 0;
+    }
+
     Power* power = power_alloc();
     if(!LOAD_POWER_SETTINGS(&power->shutdown_idle_delay_ms)) {
         power->shutdown_idle_delay_ms = 0;
@@ -512,7 +529,25 @@ int32_t power_srv(void* p) {
 
     DesktopSettings* settings = malloc(sizeof(DesktopSettings));
     DESKTOP_SETTINGS_LOAD(settings);
-    power->displayBatteryPercentage = settings->displayBatteryPercentage;
+
+    if(settings->displayBatteryPercentage != DISPLAY_BATTERY_NONE) {
+        power->displayBatteryPercentage = settings->displayBatteryPercentage;
+        switch(settings->icon_style) {
+        case ICON_STYLE_SLIM:
+            view_port_enabled_set(power->battery_slim_view_port, true);
+            view_port_enabled_set(power->battery_view_port, false);
+            break;
+        case ICON_STYLE_STOCK:
+            view_port_enabled_set(power->battery_slim_view_port, false);
+            view_port_enabled_set(power->battery_view_port, true);
+            break;
+        }
+    } else {
+        power->displayBatteryPercentage = settings->displayBatteryPercentage;
+        view_port_enabled_set(power->battery_view_port, false);
+        view_port_enabled_set(power->battery_slim_view_port, false);
+    }
+
     free(settings);
 
     while(1) {
@@ -532,9 +567,42 @@ int32_t power_srv(void* p) {
         if(need_refresh) {
             DesktopSettings* settings = malloc(sizeof(DesktopSettings));
             DESKTOP_SETTINGS_LOAD(settings);
-            power->displayBatteryPercentage = settings->displayBatteryPercentage;
+
+            if(power->displayBatteryPercentage == DISPLAY_BATTERY_NONE) {
+                if(settings->displayBatteryPercentage != DISPLAY_BATTERY_NONE) {
+                    power->displayBatteryPercentage = settings->displayBatteryPercentage;
+                    switch(settings->icon_style) {
+                    case ICON_STYLE_SLIM:
+                        view_port_enabled_set(power->battery_slim_view_port, true);
+                        view_port_enabled_set(power->battery_view_port, false);
+                        view_port_update(power->battery_slim_view_port);
+                        break;
+                    case ICON_STYLE_STOCK:
+                        view_port_enabled_set(power->battery_view_port, true);
+                        view_port_enabled_set(power->battery_slim_view_port, false);
+                        view_port_update(power->battery_view_port);
+                        break;
+                    }
+                }
+            } else {
+                if(settings->displayBatteryPercentage == DISPLAY_BATTERY_NONE) {
+                    power->displayBatteryPercentage = settings->displayBatteryPercentage;
+                    view_port_enabled_set(power->battery_view_port, false);
+                    view_port_enabled_set(power->battery_slim_view_port, false);
+                } else {
+                    power->displayBatteryPercentage = settings->displayBatteryPercentage;
+                    switch(settings->icon_style) {
+                    case ICON_STYLE_SLIM:
+                        view_port_update(power->battery_slim_view_port);
+                        break;
+                    case ICON_STYLE_STOCK:
+                        view_port_update(power->battery_view_port);
+                        break;
+                    }
+                }
+            }
+
             free(settings);
-            view_port_update(power->battery_view_port);
         }
 
         // Check OTG status and disable it in case of fault

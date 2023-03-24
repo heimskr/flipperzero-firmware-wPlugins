@@ -20,16 +20,28 @@ typedef DialogMessageButton (*AboutDialogScreen)(DialogsApp* dialogs, DialogMess
 static DialogMessageButton product_screen(DialogsApp* dialogs, DialogMessage* message) {
     DialogMessageButton result;
 
-    const char* screen_header = "Product: Flipper Zero\n"
-                                "Model: FZ.1\n";
-    const char* screen_text = "FCC ID: 2A2V6-FZ\n"
-                              "IC: 27624-FZ";
+    FuriString* screen_header = furi_string_alloc_printf(
+        "Product: %s\n"
+        "Model: %s",
+        furi_hal_version_get_model_name(),
+        furi_hal_version_get_model_code());
 
-    dialog_message_set_header(message, screen_header, 0, 0, AlignLeft, AlignTop);
-    dialog_message_set_text(message, screen_text, 0, 26, AlignLeft, AlignTop);
+    FuriString* screen_text = furi_string_alloc_printf(
+        "FCC ID: %s\n"
+        "IC: %s",
+        furi_hal_version_get_fcc_id(),
+        furi_hal_version_get_ic_id());
+
+    dialog_message_set_header(
+        message, furi_string_get_cstr(screen_header), 0, 0, AlignLeft, AlignTop);
+    dialog_message_set_text(
+        message, furi_string_get_cstr(screen_text), 0, 26, AlignLeft, AlignTop);
     result = dialog_message_show(dialogs, message);
     dialog_message_set_header(message, NULL, 0, 0, AlignLeft, AlignTop);
     dialog_message_set_text(message, NULL, 0, 0, AlignLeft, AlignTop);
+
+    furi_string_free(screen_header);
+    furi_string_free(screen_text);
 
     return result;
 }
@@ -203,15 +215,15 @@ static void draw_battery(Canvas* canvas, PowerInfo* info, int x, int y) {
             drain_current > HIGH_DRAIN_CURRENT_THRESHOLD ? "mA!" : "mA");
     } else if(drain_current != 0) {
         snprintf(header, 20, "...");
-    } else if(info->voltage_battery_charging < 4.2) {
+    } else if(info->voltage_battery_charge_limit < 4.2) {
         // Non-default battery charging limit, mention it
         snprintf(header, sizeof(header), "Limited to");
         snprintf(
             value,
             sizeof(value),
             "%lu.%luV",
-            (uint32_t)(info->voltage_battery_charging),
-            (uint32_t)(info->voltage_battery_charging * 10) % 10);
+            (uint32_t)(info->voltage_battery_charge_limit),
+            (uint32_t)(info->voltage_battery_charge_limit * 10) % 10);
     } else {
         snprintf(header, sizeof(header), "Charged!");
     }

@@ -62,6 +62,7 @@ struct SubGhzTxRx {
     SubGhzEnvironment* environment;
     SubGhzReceiver* receiver;
     SubGhzTransmitter* transmitter;
+    SubGhzProtocolFlag filter;
     SubGhzProtocolDecoderBase* decoder_result;
     FlipperFormat* fff_data;
     SecureData* secure_data;
@@ -75,6 +76,8 @@ struct SubGhzTxRx {
     uint8_t hopper_timeout;
     uint8_t hopper_idx_frequency;
     SubGhzRxKeyState rx_key_state;
+
+    bool debug_pin_state;
 
     float raw_threshold_rssi;
     uint8_t raw_threshold_rssi_low_count;
@@ -161,7 +164,6 @@ void subghz_file_name_clear(SubGhz* subghz);
 bool subghz_path_is_file(FuriString* path);
 uint32_t subghz_random_serial(void);
 void subghz_hopper_update(SubGhz* subghz);
-
 void subghz_speaker_on(SubGhz* subghz);
 void subghz_speaker_off(SubGhz* subghz);
 void subghz_speaker_mute(SubGhz* subghz);

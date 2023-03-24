@@ -3,7 +3,6 @@
 #include <dolphin/dolphin.h>
 #include <lib/subghz/protocols/raw.h>
 #include <lib/toolbox/path.h>
-#include <stm32wbxx_ll_rtc.h>
 #include <float_tools.h>
 
 #define RAW_FILE_NAME "R_"
@@ -119,9 +118,6 @@ void subghz_scene_read_raw_on_enter(void* context) {
     subghz->txrx->decoder_result = subghz_receiver_search_decoder_base_by_name(
         subghz->txrx->receiver, SUBGHZ_PROTOCOL_RAW_NAME);
     furi_assert(subghz->txrx->decoder_result);
-
-    // make sure we're not in auto-detect mode, which is only meant for the Read app
-    subghz_protocol_decoder_raw_set_auto_mode(subghz->txrx->decoder_result, false);
 
     //set filter RAW feed
     subghz_receiver_set_filter(subghz->txrx->receiver, SubGhzProtocolFlag_RAW);
@@ -295,28 +291,8 @@ bool subghz_scene_read_raw_on_event(void* context, SceneManagerEvent event) {
 
             FuriString* temp_str;
             temp_str = furi_string_alloc();
-
-            uint32_t time = LL_RTC_TIME_Get(RTC); // 0x00HHMMSS
-            uint32_t date = LL_RTC_DATE_Get(RTC); // 0xWWDDMMYY
-            char strings[1][25];
-            snprintf(
-                strings[0],
-                sizeof(strings[0]),
-                "%s%.4d%.2d%.2d%.2d%.2d",
-                "R",
-                __LL_RTC_CONVERT_BCD2BIN((date >> 0) & 0xFF) + 2000 // YEAR
-                ,
-                __LL_RTC_CONVERT_BCD2BIN((date >> 8) & 0xFF) // MONTH
-                ,
-                __LL_RTC_CONVERT_BCD2BIN((date >> 16) & 0xFF) // DAY
-                ,
-                __LL_RTC_CONVERT_BCD2BIN((time >> 16) & 0xFF) // HOUR
-                ,
-                __LL_RTC_CONVERT_BCD2BIN((time >> 8) & 0xFF) // DAY
-            );
-
             furi_string_printf(
-                temp_str, "%s/%s%s", SUBGHZ_RAW_FOLDER, strings[0], SUBGHZ_APP_EXTENSION);
+                temp_str, "%s/%s%s", SUBGHZ_RAW_FOLDER, RAW_FILE_NAME, SUBGHZ_APP_EXTENSION);
             subghz_protocol_raw_gen_fff_data(
                 subghz->txrx->fff_data, furi_string_get_cstr(temp_str));
             furi_string_free(temp_str);
@@ -337,29 +313,10 @@ bool subghz_scene_read_raw_on_event(void* context, SceneManagerEvent event) {
             if(subghz->txrx->rx_key_state != SubGhzRxKeyStateIDLE) {
                 scene_manager_next_scene(subghz->scene_manager, SubGhzSceneNeedSaving);
             } else {
-                uint32_t time = LL_RTC_TIME_Get(RTC); // 0x00HHMMSS
-                uint32_t date = LL_RTC_DATE_Get(RTC); // 0xWWDDMMYY
-                char strings[1][25];
-                snprintf(
-                    strings[0],
-                    sizeof(strings[0]),
-                    "%s%.4d%.2d%.2d%.2d%.2d",
-                    "R",
-                    __LL_RTC_CONVERT_BCD2BIN((date >> 0) & 0xFF) + 2000 // YEAR
-                    ,
-                    __LL_RTC_CONVERT_BCD2BIN((date >> 8) & 0xFF) // MONTH
-                    ,
-                    __LL_RTC_CONVERT_BCD2BIN((date >> 16) & 0xFF) // DAY
-                    ,
-                    __LL_RTC_CONVERT_BCD2BIN((time >> 16) & 0xFF) // HOUR
-                    ,
-                    __LL_RTC_CONVERT_BCD2BIN((time >> 8) & 0xFF) // DAY
-                );
-                //subghz_get_preset_name(subghz, subghz->error_str);
                 subghz->txrx->raw_threshold_rssi_low_count = RAW_THRESHOLD_RSSI_LOW_COUNT;
                 if(subghz_protocol_raw_save_to_file_init(
                        (SubGhzProtocolDecoderRAW*)subghz->txrx->decoder_result,
-                       strings[0],
+                       RAW_FILE_NAME,
                        subghz->txrx->preset)) {
                     DOLPHIN_DEED(DolphinDeedSubGhzRawRec);
                     if((subghz->txrx->txrx_state == SubGhzTxRxStateIDLE) ||
@@ -411,7 +368,7 @@ bool subghz_scene_read_raw_on_event(void* context, SceneManagerEvent event) {
 
             float rssi = furi_hal_subghz_get_rssi();
 
-            if(float_is_equal(subghz->txrx->raw_threshold_rssi, SUBGHZ_RAW_TRESHOLD_MIN)) {
+            if(float_is_equal(subghz->txrx->raw_threshold_rssi, SUBGHZ_RAW_THRESHOLD_MIN)) {
                 subghz_read_raw_add_data_rssi(subghz->subghz_read_raw, rssi, true);
                 subghz_protocol_raw_save_to_file_pause(
                     (SubGhzProtocolDecoderRAW*)subghz->txrx->decoder_result, false);
@@ -462,10 +419,6 @@ void subghz_scene_read_raw_on_exit(void* context) {
     subghz->state_notifications = SubGhzNotificationStateIDLE;
     notification_message(subghz->notifications, &sequence_reset_rgb);
 
-//filter restoration
-#ifdef SUBGHZ_SAVE_DETECT_RAW_SETTING
-    subghz_last_settings_set_detect_raw_values(subghz);
-#else
-    subghz_receiver_set_filter(subghz->txrx->receiver, SubGhzProtocolFlag_Decodable);
-#endif
+    //filter restoration
+    subghz_receiver_set_filter(subghz->txrx->receiver, subghz->txrx->filter);
 }

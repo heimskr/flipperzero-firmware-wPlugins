@@ -28,8 +28,8 @@
 [submodule "lib/cxxheaderparser"]
 	path = lib/cxxheaderparser
 	url = https://github.com/robotpy/cxxheaderparser.git
-[submodule "applications/plugins/dap_link/lib/free-dap"]
-	path = applications/plugins/dap_link/lib/free-dap
+[submodule "applications/external/dap_link/lib/free-dap"]
+	path = applications/external/dap_link/lib/free-dap
 	url = https://github.com/ataradov/free-dap.git
 [submodule "applications_user/bme680"]
 	path = applications_user/bme680
@@ -40,3 +40,7 @@
 [submodule "applications_user/mcp4725"]
 	path = applications_user/mcp4725
 	url = https://github.com/heimskr/flipperzero-mcp4725.git
+[submodule "lib/heatshrink"]
+	path = lib/heatshrink
+	url = https://github.com/flipperdevices/heatshrink.git
+

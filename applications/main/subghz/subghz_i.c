@@ -69,7 +69,7 @@ void subghz_begin(SubGhz* subghz, uint8_t* preset_data) {
     furi_hal_subghz_reset();
     furi_hal_subghz_idle();
     furi_hal_subghz_load_custom_preset(preset_data);
-    furi_hal_gpio_init(&gpio_cc1101_g0, GpioModeInput, GpioPullNo, GpioSpeedLow);
+    furi_hal_gpio_init(furi_hal_subghz.cc1101_g0_pin, GpioModeInput, GpioPullNo, GpioSpeedLow);
     subghz->txrx->txrx_state = SubGhzTxRxStateIDLE;
 }
 
@@ -84,7 +84,7 @@ uint32_t subghz_rx(SubGhz* subghz, uint32_t frequency) {
 
     furi_hal_subghz_idle();
     uint32_t value = furi_hal_subghz_set_frequency_and_path(frequency);
-    furi_hal_gpio_init(&gpio_cc1101_g0, GpioModeInput, GpioPullNo, GpioSpeedLow);
+    furi_hal_gpio_init(furi_hal_subghz.cc1101_g0_pin, GpioModeInput, GpioPullNo, GpioSpeedLow);
     furi_hal_subghz_flush_rx();
     subghz_speaker_on(subghz);
     furi_hal_subghz_rx();
@@ -103,8 +103,9 @@ static bool subghz_tx(SubGhz* subghz, uint32_t frequency) {
     furi_assert(subghz->txrx->txrx_state != SubGhzTxRxStateSleep);
     furi_hal_subghz_idle();
     furi_hal_subghz_set_frequency_and_path(frequency);
-    furi_hal_gpio_write(&gpio_cc1101_g0, false);
-    furi_hal_gpio_init(&gpio_cc1101_g0, GpioModeOutputPushPull, GpioPullNo, GpioSpeedLow);
+    furi_hal_gpio_write(furi_hal_subghz.cc1101_g0_pin, false);
+    furi_hal_gpio_init(
+        furi_hal_subghz.cc1101_g0_pin, GpioModeOutputPushPull, GpioPullNo, GpioSpeedLow);
     subghz_speaker_on(subghz);
     bool ret = furi_hal_subghz_tx();
     subghz->txrx->txrx_state = SubGhzTxRxStateTx;
@@ -153,7 +154,6 @@ bool subghz_tx_start(SubGhz* subghz, FlipperFormat* flipper_format) {
             FURI_LOG_E(TAG, "Missing Protocol");
             break;
         }
-        //ToDo FIX
         if(!flipper_format_insert_or_update_uint32(flipper_format, "Repeat", &repeat, 1)) {
             FURI_LOG_E(TAG, "Unable Repeat");
             break;
@@ -163,7 +163,8 @@ bool subghz_tx_start(SubGhz* subghz, FlipperFormat* flipper_format) {
             subghz->txrx->environment, furi_string_get_cstr(temp_str));
 
         if(subghz->txrx->transmitter) {
-            if(subghz_transmitter_deserialize(subghz->txrx->transmitter, flipper_format)) {
+            if(subghz_transmitter_deserialize(subghz->txrx->transmitter, flipper_format) ==
+               SubGhzProtocolStatusOk) {
                 if(strcmp(furi_string_get_cstr(subghz->txrx->preset->name), "") != 0) {
                     subghz_begin(
                         subghz,
@@ -186,7 +187,12 @@ bool subghz_tx_start(SubGhz* subghz, FlipperFormat* flipper_format) {
                     //Start TX
                     furi_hal_subghz_start_async_tx(
                         subghz_transmitter_yield, subghz->txrx->transmitter);
+                } else {
+                    subghz_dialog_message_show_only_rx(subghz);
                 }
+            } else {
+                dialog_message_show_storage_error(
+                    subghz->dialogs, "Error in protocol\nparameters\ndescription");
             }
         }
         if(!ret) {
@@ -334,8 +340,10 @@ bool subghz_key_load(SubGhz* subghz, const char* file_path, bool show_dialog) {
         subghz->txrx->decoder_result = subghz_receiver_search_decoder_base_by_name(
             subghz->txrx->receiver, furi_string_get_cstr(temp_str));
         if(subghz->txrx->decoder_result) {
-            if(!subghz_protocol_decoder_base_deserialize(
-                   subghz->txrx->decoder_result, subghz->txrx->fff_data)) {
+            SubGhzProtocolStatus status = subghz_protocol_decoder_base_deserialize(
+                subghz->txrx->decoder_result, subghz->txrx->fff_data);
+            if(status != SubGhzProtocolStatusOk) {
+                load_key_state = SubGhzLoadKeyStateProtocolDescriptionErr;
                 break;
             }
         } else {
@@ -354,6 +362,12 @@ bool subghz_key_load(SubGhz* subghz, const char* file_path, bool show_dialog) {
     case SubGhzLoadKeyStateParseErr:
         if(show_dialog) {
             dialog_message_show_storage_error(subghz->dialogs, "Cannot parse\nfile");
+        }
+        return false;
+    case SubGhzLoadKeyStateProtocolDescriptionErr:
+        if(show_dialog) {
+            dialog_message_show_storage_error(
+                subghz->dialogs, "Error in protocol\nparameters\ndescription");
         }
         return false;
 
@@ -574,7 +588,7 @@ void subghz_hopper_update(SubGhz* subghz) {
             return;
         }
     } else {
-        subghz->txrx->hopper_state = SubGhzHopperStateRunnig;
+        subghz->txrx->hopper_state = SubGhzHopperStateRunning;
     }
     // Select next frequency
     if(subghz->txrx->hopper_idx_frequency <
@@ -596,9 +610,15 @@ void subghz_hopper_update(SubGhz* subghz) {
 }
 
 void subghz_speaker_on(SubGhz* subghz) {
+    if(subghz->txrx->debug_pin_state) {
+        furi_hal_subghz_set_async_mirror_pin(&ibutton_gpio);
+    }
+
     if(subghz->txrx->speaker_state == SubGhzSpeakerStateEnable) {
         if(furi_hal_speaker_acquire(30)) {
-            furi_hal_subghz_set_async_mirror_pin(&gpio_speaker);
+            if(!subghz->txrx->debug_pin_state) {
+                furi_hal_subghz_set_async_mirror_pin(&gpio_speaker);
+            }
         } else {
             subghz->txrx->speaker_state = SubGhzSpeakerStateDisable;
         }
@@ -606,9 +626,14 @@ void subghz_speaker_on(SubGhz* subghz) {
 }
 
 void subghz_speaker_off(SubGhz* subghz) {
+    if(subghz->txrx->debug_pin_state) {
+        furi_hal_subghz_set_async_mirror_pin(NULL);
+    }
     if(subghz->txrx->speaker_state != SubGhzSpeakerStateDisable) {
         if(furi_hal_speaker_is_mine()) {
-            furi_hal_subghz_set_async_mirror_pin(NULL);
+            if(!subghz->txrx->debug_pin_state) {
+                furi_hal_subghz_set_async_mirror_pin(NULL);
+            }
             furi_hal_speaker_release();
             if(subghz->txrx->speaker_state == SubGhzSpeakerStateShutdown)
                 subghz->txrx->speaker_state = SubGhzSpeakerStateDisable;
@@ -617,17 +642,27 @@ void subghz_speaker_off(SubGhz* subghz) {
 }
 
 void subghz_speaker_mute(SubGhz* subghz) {
+    if(subghz->txrx->debug_pin_state) {
+        furi_hal_subghz_set_async_mirror_pin(NULL);
+    }
     if(subghz->txrx->speaker_state == SubGhzSpeakerStateEnable) {
         if(furi_hal_speaker_is_mine()) {
-            furi_hal_subghz_set_async_mirror_pin(NULL);
+            if(!subghz->txrx->debug_pin_state) {
+                furi_hal_subghz_set_async_mirror_pin(NULL);
+            }
         }
     }
 }
 
 void subghz_speaker_unmute(SubGhz* subghz) {
+    if(subghz->txrx->debug_pin_state) {
+        furi_hal_subghz_set_async_mirror_pin(&ibutton_gpio);
+    }
     if(subghz->txrx->speaker_state == SubGhzSpeakerStateEnable) {
         if(furi_hal_speaker_is_mine()) {
-            furi_hal_subghz_set_async_mirror_pin(&gpio_speaker);
+            if(!subghz->txrx->debug_pin_state) {
+                furi_hal_subghz_set_async_mirror_pin(&gpio_speaker);
+            }
         }
     }
 }

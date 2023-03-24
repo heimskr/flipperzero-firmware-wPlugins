@@ -1,12 +1,14 @@
-#include <archive/views/archive_browser_view.h>
 #include "archive_files.h"
 #include "archive_apps.h"
 #include "archive_browser.h"
+#include "../views/archive_browser_view.h"
+
 #include <core/common_defines.h>
 #include <core/log.h>
-#include "gui/modules/file_browser_worker.h"
+#include <gui/modules/file_browser_worker.h>
 #include <fap_loader/fap_loader_app.h>
 #include <math.h>
+#include <furi_hal.h>
 
 static void
     archive_folder_open_cb(void* context, uint32_t item_cnt, int32_t file_idx, bool is_root) {
@@ -55,9 +57,14 @@ static void archive_list_load_cb(void* context, uint32_t list_load_offset) {
         false);
 }
 
-static void
-    archive_list_item_cb(void* context, FuriString* item_path, bool is_folder, bool is_last) {
+static void archive_list_item_cb(
+    void* context,
+    FuriString* item_path,
+    uint32_t idx,
+    bool is_folder,
+    bool is_last) {
     furi_assert(context);
+    UNUSED(idx);
     ArchiveBrowserView* browser = (ArchiveBrowserView*)context;
 
     if(!is_last) {
@@ -67,7 +74,9 @@ static void
             browser->view,
             ArchiveBrowserViewModel * model,
             {
-                files_array_sort(model->files);
+                if(model->item_cnt <= BROWSER_SORT_THRESHOLD) {
+                    files_array_sort(model->files);
+                }
                 model->list_loading = false;
             },
             true);
@@ -145,7 +154,7 @@ void archive_update_focus(ArchiveBrowserView* browser, const char* target) {
     archive_get_items(browser, furi_string_get_cstr(browser->path));
 
     if(!archive_file_get_array_size(browser) && archive_is_home(browser)) {
-        archive_switch_tab(browser, TAB_RIGHT);
+        archive_switch_tab(browser, TAB_LEFT);
     } else {
         with_view_model(
             browser->view,
@@ -212,7 +221,7 @@ void archive_file_array_rm_selected(ArchiveBrowserView* browser) {
         false);
 
     if((items_cnt == 0) && (archive_is_home(browser))) {
-        archive_switch_tab(browser, TAB_RIGHT);
+        archive_switch_tab(browser, TAB_LEFT);
     }
 
     archive_update_offset(browser);
@@ -442,7 +451,7 @@ static bool archive_is_dir_exists(FuriString* path) {
     FileInfo file_info;
     Storage* storage = furi_record_open(RECORD_STORAGE);
     if(storage_common_stat(storage, furi_string_get_cstr(path), &file_info) == FSE_OK) {
-        if(file_info.flags & FSF_DIRECTORY) {
+        if(file_info_is_dir(&file_info)) {
             state = true;
         }
     }
@@ -460,6 +469,13 @@ void archive_switch_tab(ArchiveBrowserView* browser, InputKey key) {
         tab = ((tab - 1) + ArchiveTabTotal) % ArchiveTabTotal;
     } else {
         tab = (tab + 1) % ArchiveTabTotal;
+    }
+    if(tab == ArchiveTabInternal && !furi_hal_rtc_is_flag_set(FuriHalRtcFlagDebug)) {
+        if(key == InputKeyLeft) {
+            tab = ((tab - 1) + ArchiveTabTotal) % ArchiveTabTotal;
+        } else {
+            tab = (tab + 1) % ArchiveTabTotal;
+        }
     }
 
     browser->is_root = true;
@@ -485,7 +501,7 @@ void archive_switch_tab(ArchiveBrowserView* browser, InputKey key) {
             // Hide dot files everywhere except Browser
             bool hide_dot_files = (strcmp(archive_get_tab_ext(tab), "*") == 0) ? false : true;
             archive_file_browser_set_path(
-                browser, browser->path, archive_get_tab_ext(tab), skip_assets, false);
+                browser, browser->path, archive_get_tab_ext(tab), skip_assets, hide_dot_files);
             tab_empty = false; // Empty check will be performed later
         }
     }
@@ -516,11 +532,15 @@ void archive_enter_dir(ArchiveBrowserView* browser, FuriString* path) {
         browser->view, ArchiveBrowserViewModel * model, { idx_temp = model->item_idx; }, false);
 
     furi_string_set(browser->path, path);
+
     file_browser_worker_folder_enter(browser->worker, path, idx_temp);
 }
 
 void archive_leave_dir(ArchiveBrowserView* browser) {
     furi_assert(browser);
+
+    size_t dirname_start = furi_string_search_rchar(browser->path, '/');
+    furi_string_left(browser->path, dirname_start);
 
     file_browser_worker_folder_exit(browser->worker);
 }
